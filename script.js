@@ -1,8 +1,5 @@
 'use strict';
 
-// prettier-ignore
-const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-
 const form = document.querySelector('.form');
 const containerWorkouts = document.querySelector('.workouts');
 const inputType = document.querySelector('.form__input--type');
@@ -54,6 +51,17 @@ class App {
     inputDistance.focus();
   }
 
+  _hideForm() {
+    inputDistance.value =
+      inputDuration.value =
+      inputCadence.value =
+      inputElevation.value =
+        '';
+    form.style.display = 'none';
+    form.classList.add('hidden');
+    setTimeout(() => (form.style.display = 'grid'), 1000);
+  }
+
   _toggleElevationField() {
     inputElevation.closest('.form__row').classList.toggle('form__row--hidden');
     inputCadence.closest('.form__row').classList.toggle('form__row--hidden');
@@ -88,14 +96,9 @@ class App {
       workout = new Cycling(coords, distance, duration, elevation);
     }
     this.#workouts.push(workout);
-    // Clean input fields
-    inputDistance.value =
-      inputDuration.value =
-      inputCadence.value =
-      inputElevation.value =
-        '';
-    // Add marker on click event
     this._renderWorkoutMarker(workout);
+    this._renderWorkout(workout);
+    this._hideForm();
   }
 
   _renderWorkoutMarker(workout) {
@@ -111,8 +114,48 @@ class App {
           className: `${type}-popup`,
         })
       )
-      .setPopupContent(String(distance))
+      .setPopupContent(
+        `${type === 'running' ? '🏃‍♂️' : '🚴‍♀️'} ${workout.description}`
+      )
       .openPopup();
+  }
+
+  _renderWorkout(workout) {
+    const { type, id, description, distance, duration } = workout;
+    const html = `
+      <li class="workout workout--${type}" data-id="${id}">
+        <h2 class="workout__title">${description}</h2>
+        <div class="workout__details">
+          <span class="workout__icon">${type === 'running' ? '🏃‍♂️' : '🚴‍♀️'}</span>
+          <span class="workout__value">${distance}</span>
+          <span class="workout__unit">km</span>
+        </div>
+        <div class="workout__details">
+          <span class="workout__icon">⏱</span>
+          <span class="workout__value">${duration}</span>
+          <span class="workout__unit">min</span>
+        </div>
+        <div class="workout__details">
+          <span class="workout__icon">⚡️</span>
+          <span class="workout__value">${(type === 'running'
+            ? workout.pace
+            : workout.speed
+          ).toFixed(1)}</span>
+          <span class="workout__unit">${
+            type === 'running' ? 'min/km' : 'km/h'
+          }</span>
+        </div>
+        <div class="workout__details">
+          <span class="workout__icon">${type === 'running' ? '🦶🏼' : '⛰'}</span>
+          <span class="workout__value">${(type === 'running'
+            ? workout.cadence
+            : workout.elevationGain
+          ).toFixed(1)}</span>
+          <span class="workout__unit">${type === 'running' ? 'spm' : 'm'}</span>
+        </div>
+      </li>
+    `;
+    form.insertAdjacentHTML('afterend', html);
   }
 }
 
@@ -125,6 +168,14 @@ class Workout {
     this.distance = distance; // km
     this.duration = duration; // min
   }
+
+  _setDescription() {
+    // prettier-ignore
+    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    this.description = `${this.type[0].toUpperCase()}${this.type.slice(1)} on ${
+      months[this.date.getMonth()]
+    } ${this.date.getDate()}`;
+  }
 }
 
 class Running extends Workout {
@@ -133,10 +184,11 @@ class Running extends Workout {
   constructor(coords, distance, duration, cadence) {
     super(coords, distance, duration);
     this.cadence = cadence;
-    this.calcPace();
+    this._calcPace();
+    this._setDescription();
   }
 
-  calcPace() {
+  _calcPace() {
     this.pace = this.duration / this.distance;
     return this.pace;
   }
@@ -148,10 +200,11 @@ class Cycling extends Workout {
   constructor(coords, distance, duration, elevationGain) {
     super(coords, distance, duration);
     this.elevationGain = elevationGain;
-    this.calcSpeed();
+    this._calcSpeed();
+    this._setDescription();
   }
 
-  calcSpeed() {
+  _calcSpeed() {
     this.speed = this.distance / (this.duration / 60);
     return this.speed;
   }
