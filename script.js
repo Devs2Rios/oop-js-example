@@ -21,6 +21,7 @@ class App {
 
   constructor() {
     this._getPosition();
+    this._getLocalStorage();
     form.addEventListener('submit', this._newWorkout.bind(this));
     inputType.addEventListener('change', this._toggleElevationField);
     containerWorkouts.addEventListener('click', this._moveToPopup.bind(this));
@@ -44,6 +45,9 @@ class App {
       attribution:
         '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     }).addTo(this.#map);
+    this.#workouts.forEach(work => {
+      this._renderWorkoutMarker(work);
+    });
     this.#map.on('click', this._showForm.bind(this));
   }
 
@@ -101,10 +105,11 @@ class App {
     this._renderWorkoutMarker(workout);
     this._renderWorkout(workout);
     this._hideForm();
+    this._setLocalStorage();
   }
 
   _renderWorkoutMarker(workout) {
-    const { coords, type, distance } = workout;
+    const { coords, type } = workout;
     L.marker(coords)
       .addTo(this.#map)
       .bindPopup(
@@ -174,14 +179,49 @@ class App {
     });
     workout.click();
   }
+
+  _setLocalStorage() {
+    localStorage.setItem('workouts', JSON.stringify(this.#workouts));
+  }
+
+  _getLocalStorage() {
+    const data = JSON.parse(localStorage.getItem('workouts'));
+    if (!data) return;
+    this.#workouts = data.map(work => {
+      if (work.type === 'running')
+        return new Running(
+          work.coords,
+          work.distance,
+          work.duration,
+          work.cadence,
+          work.id
+        );
+      if (work.type === 'cycling')
+        return new Cycling(
+          work.coords,
+          work.distance,
+          work.duration,
+          work.elevationGain,
+          work.id
+        );
+    });
+    this.#workouts.forEach(work => {
+      this._renderWorkout(work);
+    });
+  }
+
+  reset() {
+    localStorage.removeItem('workouts');
+    location.reload();
+  }
 }
 
 class Workout {
   date = new Date();
-  id = (Date.now() + '').slice(-10);
   clicks = 0;
 
-  constructor(coords, distance, duration) {
+  constructor(coords, distance, duration, id) {
+    this.id = id ?? this._setId();
     this.coords = coords;
     this.distance = distance; // km
     this.duration = duration; // min
@@ -195,6 +235,10 @@ class Workout {
     } ${this.date.getDate()}`;
   }
 
+  _setId() {
+    return (Date.now() + '').slice(-10);
+  }
+
   click() {
     this.clicks++;
   }
@@ -203,8 +247,8 @@ class Workout {
 class Running extends Workout {
   type = 'running';
 
-  constructor(coords, distance, duration, cadence) {
-    super(coords, distance, duration);
+  constructor(coords, distance, duration, cadence, id = null) {
+    super(coords, distance, duration, id);
     this.cadence = cadence;
     this._calcPace();
     this._setDescription();
@@ -219,8 +263,8 @@ class Running extends Workout {
 class Cycling extends Workout {
   type = 'cycling';
 
-  constructor(coords, distance, duration, elevationGain) {
-    super(coords, distance, duration);
+  constructor(coords, distance, duration, elevationGain, id = null) {
+    super(coords, distance, duration, id);
     this.elevationGain = elevationGain;
     this._calcSpeed();
     this._setDescription();
